@@ -1,0 +1,28 @@
+---
+layout: default
+title: Builder
+---
+<div class="row">
+  <div class="col-md-12">
+    <h2 class="pt-3">SLD -> JavaScript -> SLD</h2>
+    <p>The SLD is parsed using Reader into JavaScript, then converted back into SLD using Builder</p>
+  </div>
+</div>
+<div class="row">
+  <div class="col-md-6">
+    <textarea id="sld"></textarea>
+  </div>
+  <div class="col-md-6">
+    <textarea id="sld2"></textarea>
+  </div>
+</div>
+</div>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.41.0/codemirror.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.41.0/mode/xml/xml.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.41.0/addon/fold/foldcode.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.41.0/addon/fold/foldgutter.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.41.0/addon/fold/xml-fold.min.js"></script>
+<script src="assets/builder.js"></script>
+</body>
+
+</html>

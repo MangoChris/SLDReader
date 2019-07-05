@@ -16,8 +16,13 @@ module.exports = function kc(config) {
     files: [
       'node_modules/core-js/client/shim.min.js',
       {
-        pattern: 'test/**/*.test.js',
-        watched: false,
+        pattern: 'test/**/Builder.test.js',
+        watched: true,
+      },
+      {
+        pattern: 'src/Builder.js',
+        watched: true,
+        included: false,
       },
     ],
 
@@ -62,7 +67,7 @@ module.exports = function kc(config) {
 
     // start these browsers
     // available browser launchers: https://npmjs.org/browse/keyword/karma-launcher
-    browsers: ['FirefoxHeadless'],
+    browsers: ['FirefoxHeadless', 'Firefox'],
 
     // Continuous Integration mode
     // if true, Karma captures browsers, runs the tests and exits

@@ -19,6 +19,8 @@
         crossorigin="anonymous"></script>
 
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.41.0/codemirror.min.css" />
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.41.0/addon/fold/foldgutter.min.css" />
+
     <style>
         html,
         body {
@@ -31,7 +33,7 @@
         }
 
         .CodeMirror {
-            height: calc(80vh - 220px);
+            height: calc(95vh - 220px);
             min-height: 300px;
         }
     </style>
@@ -60,6 +62,9 @@
                     <li class="nav-item">
                         <a class="nav-link {% if page.title == 'API' %}active{% endif %}" href="api.html">api
                             docs</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link {% if page.title == 'Builder' %}active{% endif %}" href="builder.html">builder</a>
                     </li>
                 </ul>
                 <ul class="navbar-nav">

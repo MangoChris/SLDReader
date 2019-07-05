@@ -1,0 +1,37 @@
+const builders = Object.assign(
+  {
+    layers: (layers, result) => {
+      for (let i = 0; i < layers.length; i += 1) {
+        const namedLayer = `
+
+        `;
+        result = result + namedLayer;
+      }
+    }
+  }
+);
+
+function buildNode(obj, result) {
+  Object.entreis(obj).forEach((key, value) => {
+    builders[key](value, result);
+  });
+}
+
+export default function Builder(obj) {
+  const version = obj.version || '1.0.0';
+  const result = '';
+  buildNode(obj, result);
+
+  const sld = `<?xml version="1.0" encoding="UTF-8"?>
+    <sld:StyledLayerDescriptor version="${version}"
+        xmlns:sld="http://www.opengis.net/sld"
+        xmlns:ogc="http://www.opengis.net/ogc"
+        xmlns:gml="http://www.opengis.net/gml"
+        xmlns:xlink="http://www.w3.org/1999/xlink"
+        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:schemaLocation="http://www.opengis.net/sld http://schemas.opengis.net/sld/${version}/StyledLayerDescriptor.xsd">
+        ${result}
+    </sld:StyledLayerDescriptor>`;
+
+  return sld;
+}

@@ -302,12 +302,12 @@
    * @return {StyledLayerDescriptor}  object representing sld style
    */
   function Reader(sld) {
-    var result = {};
+    var result = new Map();
     var parser = new DOMParser();
     var doc = parser.parseFromString(sld, 'application/xml');
 
     for (var n = doc.firstChild; n; n = n.nextSibling) {
-      result.version = n.getAttribute('version');
+      result.set('version', n.getAttribute('version'));
       readNode(n, result);
     }
     return result;
@@ -422,6 +422,362 @@
    * @property {Number} graphic.size
    * @property {Number} graphic.rotation
    * */
+
+  function addNodeArray(members, result, type) {
+    for (var i = 0; i < members.length; i += 1) {
+      var child = { fragment: '' };
+      readObj(members[i], child);
+      var fragment = ("\n<" + type + ">\n  " + (child.fragment) + "\n</" + type + ">\n").trimStart();
+      result.fragment += fragment;
+    }
+  }
+
+  function addFeatureIdArray(members, result) {
+    for (var i = 0; i < members.length; i += 1) {
+      var fragment = ("\n<ogc:FeatureId fid='" + (members[i]) + "' />\n").trimStart();
+      result.fragment += fragment;
+    }
+  }
+
+  function addFilterArray(members, result, type) {
+    var child = { fragment: '' };
+    for (var i = 0; i < members.length; i += 1) {
+      readObj(members[i], child);
+    }
+    var fragment = ("\n<" + type + ">\n  " + (child.fragment) + "\n</" + type + ">\n").trimStart();
+    result.fragment += fragment;
+  }
+
+  /**
+   * addNode
+   *
+   * @param obj
+   * @param result
+   * @param type
+   * @param attributes Optional
+   * @returns {undefined}
+   */
+
+  function addNode(obj, result, type, sequence, attributes) {
+    var attributesText = stringifyAttributes(attributes); 
+    var child = { fragment: '' };
+    readObj(obj, child, sequence);
+    var fragment = ("\n<" + type + attributesText + ">\n  " + (child.fragment) + "\n</" + type + ">\n").trimStart();
+    result.fragment += fragment;
+  }
+
+  function stringifyAttributes(attributes) {
+    var attributeText = '';
+    if (attributes && typeof attributes == 'object' && !Array.isArray(attributes)) {
+      Object.keys(attributes).forEach(function (key) {
+        attributeText = attributeText += " " + key + "='" + (attributes[key]) + "'";
+      });
+    }
+    return attributeText;
+  }
+
+  function addParameterNode(members, result, type) {
+
+    Object.keys(members).forEach(function (key) {
+      parameter(key, members[key], result, type);
+    });
+  }
+
+  function parameter(key, value, result, type) {
+    var fragment = ("\n<sld:" + type + "Parameter name='" + (camelCaseToDash(key)) + "'>\n    <ogc:Literal>" + value + "</ogc:Literal>\n</sld:" + type + "Parameter>\n").trimStart();
+    result.fragment += fragment;
+  }
+
+  function addNodeProperty(value, result, type) {
+    var fragment = ("\n<" + type + ">" + value + "</" + type + ">\n").trimStart();
+    result.fragment = fragment + result.fragment;
+  }
+
+  function addEmptyNode(result, type, attributes) {
+    var attributesText = stringifyAttributes(attributes); 
+    var fragment = ("\n<" + type + attributesText + "/>\n").trimStart();
+    result.fragment += fragment;
+  }
+
+  /**
+   * camelCaseToDash
+   *
+   * @param str
+   * @returns {undefined}
+   */
+  function camelCaseToDash(str) {
+    return str
+      .replace(/[^a-zA-Z0-9]+/g, '-')
+      .replace(/([A-Z]+)([A-Z][a-z])/g, '$1-$2')
+      .replace(/([a-z])([A-Z])/g, '$1-$2')
+      .replace(/([0-9])([^0-9])/g, '$1-$2')
+      .replace(/([^0-9])([0-9])/g, '$1-$2')
+      .replace(/-+/g, '-')
+      .toLowerCase();
+  }
+
+  var FilterBuilders = {
+    abstract: function (value, result) {
+      addNodeProperty(value, result, 'sld:Abstract');
+    },
+    default: function (value, result) {
+      if (value) { addNodeProperty(1, result, 'sld:IsDefault'); }
+    },
+    elsefilter: function (value, result) {
+      addEmptyNode(result, 'sld:ElseFilter');
+    },
+    size: function (obj, result) {
+      addNodeProperty(obj, result, 'sld:Size');
+    },
+    wellknownname: function (obj, result) {
+      addNodeProperty(obj, result, 'sld:WellKnownName');
+    },
+    version: ignore,
+    filter: function (obj, result) {
+      addNode(obj, result, 'ogc:Filter');
+    },
+    not: function (obj, result) {
+      addNode(obj, result, 'ogc:Not');
+    },
+    and: function (obj, result) {
+      addFilterArray(obj, result, 'ogc:And');
+    },
+    or: function (obj, result) {
+      addFilterArray(obj, result, 'ogc:Or');
+    },
+    propertyisequalto: function (obj, result) {
+      addNode(obj, result, 'ogc:PropertyIsEqualTo');
+    },
+    propertyisnotequalto: function (obj, result) {
+      addNode(obj, result, 'ogc:PropertyIsNotEqualTo');
+    },
+    propertyislessthan: function (obj, result) {
+      addNode(obj, result, 'ogc:PropertyIsLessThan');
+    },
+    propertyislessthanorequalto: function (obj, result) {
+      addNode(obj, result, 'ogc:PropertyIsLessThanOrEqualTo');
+    },
+    propertyisgreaterthan: function (obj, result) {
+      addNode(obj, result, 'ogc:PropertyIsGreaterThan');
+    },
+    propertyisgreaterthanorequalto: function (obj, result) {
+      addNode(obj, result, 'ogc:PropertyIsGreaterThanOrEqualTo');
+    },
+    propertyisbetween: function (obj, result) {
+      addNode(obj, result, 'ogc:PropertyIsBetween');
+    },
+    propertyislike: function (obj, result) {
+      var attributes = { 'escape': obj.escapechar, 'singleChar': obj.singlechar, 'wildCard': obj.wildcard };
+      delete obj.escapechar; 
+      delete obj.singlechar;
+      delete obj.wildcard;
+      addNode(obj, result, 'ogc:PropertyIsLike', ['propertyname', 'literal'], attributes);
+    },
+    propertyname: function (obj, result) {
+      addNodeProperty(obj, result, 'ogc:PropertyName');
+    },
+    literal: function (obj, result) {
+      addNodeProperty(obj, result, 'ogc:Literal');
+    },
+    fids: function (members, result) {
+      addFeatureIdArray(members, result, 'ogc:FeatureId');
+    },
+    lowerboundary: function (obj, result) {
+      addNodeProperty(obj, result, 'ogc:LowerBoundary');
+    },
+    upperboundary: function (obj, result) {
+      addNodeProperty(obj, result, 'ogc:UpperBoundary');
+    },
+    type: ignore,
+  };
+
+  var SymbBuilders =  {
+    polygonsymbolizer: function (obj, result) {
+      addNode(obj, result, 'sld:PolygonSymbolizer');
+    },
+    linesymbolizer: function (obj, result) {
+      addNode(obj, result, 'sld:LineSymbolizer');
+    },
+    pointsymbolizer: function (obj, result) {
+      addNode(obj, result, 'sld:PointSymbolizer');
+    },
+    textsymbolizer: function (obj, result) {
+      addNode(obj, result, 'sld:TextSymbolizer');
+    },
+    fill: function (obj, result) {
+      addNode(obj, result, 'sld:Fill');
+    },
+    stroke: function (obj, result) {
+      addNode(obj, result, 'sld:Stroke');
+    },
+    graphic: function (obj, result) {
+      addNode(obj, result, 'sld:Graphic');
+    },
+    externalgraphic: function (obj, result) {
+      addNode(obj, result, 'sld:ExternalGraphic');
+    },
+    mark: function (obj, result) {
+      addNode(obj, result, 'sld:Mark');
+    },
+    label: function (value, result) {
+      addNodeProperty(value, result, 'sld:Label');
+    },
+    halo: function (obj, result) {
+      addNode(obj, result, 'sld:Halo');
+    },
+    font: function (obj, result) {
+      addNode(obj, result, 'sld:Font');
+    },
+    radius: function (value, result) {
+      addNodeProperty(value, result, 'sld:Value');
+    },
+    labelplacement: function (obj, result) {
+      addNode(obj, result, 'sld:LabelPlacement');
+    },
+    pointplacement: function (obj, result) {
+      addNode(obj, result, 'sld:PointPlacement');
+    },
+    lineplacement: function (obj, result) {
+      addNode(obj, result, 'sld:LinePlacement');
+    },
+    perpendicularoffset: function (value, result) {
+      addNodeProperty(value, result, 'sld:PerpendicularOffset');
+    },
+    anchorpoint: function (obj, result) {
+      addNode(obj, result, 'sld:AnchorPoint');
+    },
+    anchorpointx: function (value, result) {
+      addNodeProperty(value, result, 'sld:AnchorPointX');
+    },
+    anchorpointy: function (value, result) {
+      addNodeProperty(value, result, 'sld:AnchorPointY');
+    },
+    rotation: function (value, result) {
+      addNodeProperty(value, result, 'sld:Rotation');
+    },
+    displacement: function (obj, result) {
+      addNode(obj, result, 'sld:Displacement');
+    },
+    displacementx: function (value, result) {
+      addNodeProperty(value, result, 'sld:DisplacementX');
+    },
+    displacementy: function (value, result) {
+      addNodeProperty(value, result, 'sld:DisplacementY');
+    },
+    size: function (value, result) {
+      addNodeProperty(value, result, 'sld:Size');
+    },
+    wellknownname: function (value, result) {
+      addNodeProperty(value, result, 'sld:WellKnownName');
+    },
+    // vendoroptions: (members, result) => {
+    //  NOT YET
+    // }
+    onlineresource: function (obj, result) {
+      //function addEmptyNode(result, type, attributes) {
+      var attributes = {
+        'xlink:href': obj
+      };
+      addEmptyNode(result, 'sld:OnlineResource', attributes);
+    },
+    css: function (members, result) {
+      addParameterNode(members, result, 'Css');
+    },
+    svg: function (members, result) {
+      addParameterNode(members, result, 'Svg');
+    },
+  };
+
+  var builders = Object.assign(
+    {
+      layers: function (members, result) {
+        addNodeArray(members, result, 'sld:NamedLayer');
+      },
+      styles: function (members, result) {
+        addNodeArray(members, result, 'sld:UserStyle');
+      },
+      featuretypestyles: function (members, result) {
+        addNodeArray(members, result, 'sld:FeatureTypeStyle');
+      },
+      rules: function (members, result) {
+        addNodeArray(members, result, 'sld:Rule');
+      },
+      name: function (value, result) {
+        addNodeProperty(value, result, 'sld:Name');
+      },
+      maxscaledenominator: function (value, result) {
+        addNodeProperty(value, result, 'sld:MaxScaleDenominator');
+      },
+      minscaledenominator: function (value, result) {
+        addNodeProperty(value, result, 'sld:MinScaleDenominator');
+      },
+    },
+    FilterBuilders,
+    SymbBuilders
+  );
+
+  function ignore() {
+    // do nonthing
+  }
+
+  function isFilter(obj) {
+    var filterTypes = ['comparison', 'not', 'or', 'and'];
+    return (obj.type && filterTypes.includes(obj.type));
+  }
+
+  // Filters follow a different pattern, the sld type is a property rather than the name so we need to remap them.
+  function readFilter(obj, result) {
+    var type = obj.type;
+    if (type == 'comparison') {
+      var operator = obj.operator;
+      delete obj.type;
+      delete obj.operator;
+      builders[operator](obj, result);
+    } else if (type == 'not') {
+      builders[type](obj.predicate, result);
+    } else if (type == 'and' || type == 'or') {
+      builders[type](obj.predicates, result);
+    } else {
+      throw new Error(("Filter type: " + type + " is not recognised and no builder is available."));
+    }
+  }
+
+  function readObj(obj, result, sequence) {
+    if (isFilter(obj)) {
+      readFilter(obj, result);
+    } else {
+      Object.keys(obj).forEach(function (key) {
+        try {
+          builders[key](obj[key], result);
+        } catch (e) {
+          throw new Error(("Key: " + key + ". " + (e.message)));
+        }
+      });
+    }
+  }
+
+  function prettifyXml(sourceXml) {
+    var xmlDoc = new DOMParser().parseFromString(sourceXml, 'application/xml');
+    var xslt = "\n<xsl:stylesheet version=\"1.0\" xmlns:xsl=\"http://www.w3.org/1999/XSL/Transform\">\n  <xsl:output omit-xml-declaration=\"no\" method=\"xml\" indent=\"yes\"/>\n  <xsl:strip-space elements=\"*\"/>\n  <xsl:template match=\"/\">\n    <xsl:copy-of select=\".\"/>\n  </xsl:template>\n</xsl:stylesheet>\n".trim();
+    var xsltDoc = new DOMParser().parseFromString(xslt, 'application/xml');
+    var xsltProcessor = new XSLTProcessor();
+    xsltProcessor.importStylesheet(xsltDoc);
+    var resultDoc = xsltProcessor.transformToDocument(xmlDoc);
+    var resultXml = new XMLSerializer().serializeToString(resultDoc);
+    return resultXml;
+  }
+
+  function Builder(obj) {
+    var version = obj.version || '1.0.0';
+    var result = { fragment: '' };
+    readObj(obj, result);
+
+    var fragment = "<sld:StyledLayerDescriptor version=\"" + version + "\"\n                        xmlns:sld=\"http://www.opengis.net/sld\"\n                        xmlns:ogc=\"http://www.opengis.net/ogc\"\n                        xmlns:gml=\"http://www.opengis.net/gml\"\n                        xmlns:xlink=\"http://www.w3.org/1999/xlink\"\n                        xmlns:xsi=\"http://www.w3.org/2001/XMLSchema-instance\"\n                        xsi:schemaLocation=\"http://www.opengis.net/sld http://schemas.opengis.net/sld/" + version + "/StyledLayerDescriptor.xsd\">\n                        " + (result.fragment) + "\n                    </sld:StyledLayerDescriptor>";
+
+    // Strip the empty white lines - speed vs readablity trade off
+    var prettyXml = prettifyXml(fragment);
+    return ("<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n" + prettyXml);
+  }
 
   function propertyIsLessThan(comparison, value) {
     return (
@@ -1238,6 +1594,7 @@
     };
   }
 
+  exports.Builder = Builder;
   exports.OlStyler = OlStyler;
   exports.Reader = Reader;
   exports.createOlStyleFunction = createOlStyleFunction;
