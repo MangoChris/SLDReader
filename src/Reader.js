@@ -286,12 +286,12 @@ function addTextProp(node, obj, prop) {
  * @return {StyledLayerDescriptor}  object representing sld style
  */
 export default function Reader(sld) {
-  const result = new Map();
+  const result = {};
   const parser = new DOMParser();
   const doc = parser.parseFromString(sld, 'application/xml');
 
   for (let n = doc.firstChild; n; n = n.nextSibling) {
-    result.set('version', n.getAttribute('version'));
+    result.version = n.getAttribute('version');
     readNode(n, result);
   }
   return result;

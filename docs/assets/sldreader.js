@@ -302,12 +302,12 @@
    * @return {StyledLayerDescriptor}  object representing sld style
    */
   function Reader(sld) {
-    var result = new Map();
+    var result = {};
     var parser = new DOMParser();
     var doc = parser.parseFromString(sld, 'application/xml');
 
     for (var n = doc.firstChild; n; n = n.nextSibling) {
-      result.set('version', n.getAttribute('version'));
+      result.version = n.getAttribute('version');
       readNode(n, result);
     }
     return result;
@@ -423,10 +423,18 @@
    * @property {Number} graphic.rotation
    * */
 
-  function addNodeArray(members, result, type) {
+  /*
+   * TODO:
+   *    - Add support for GraphicFill
+   *    - Add support for GraphicStroke
+   *    - Add support for Raster Symbolizers
+   *    ...
+   */
+
+  function addNodeArray(members, result, type, sequence) {
     for (var i = 0; i < members.length; i += 1) {
       var child = { fragment: '' };
-      readObj(members[i], child);
+      readObj(members[i], child, sequence);
       var fragment = ("\n<" + type + ">\n  " + (child.fragment) + "\n</" + type + ">\n").trimStart();
       result.fragment += fragment;
     }
@@ -459,25 +467,14 @@
    */
 
   function addNode(obj, result, type, sequence, attributes) {
-    var attributesText = stringifyAttributes(attributes); 
+    var attributesText = stringifyAttributes(attributes);
     var child = { fragment: '' };
     readObj(obj, child, sequence);
     var fragment = ("\n<" + type + attributesText + ">\n  " + (child.fragment) + "\n</" + type + ">\n").trimStart();
     result.fragment += fragment;
   }
 
-  function stringifyAttributes(attributes) {
-    var attributeText = '';
-    if (attributes && typeof attributes == 'object' && !Array.isArray(attributes)) {
-      Object.keys(attributes).forEach(function (key) {
-        attributeText = attributeText += " " + key + "='" + (attributes[key]) + "'";
-      });
-    }
-    return attributeText;
-  }
-
   function addParameterNode(members, result, type) {
-
     Object.keys(members).forEach(function (key) {
       parameter(key, members[key], result, type);
     });
@@ -490,13 +487,41 @@
 
   function addNodeProperty(value, result, type) {
     var fragment = ("\n<" + type + ">" + value + "</" + type + ">\n").trimStart();
-    result.fragment = fragment + result.fragment;
+    result.fragment += fragment;
+  }
+
+  function addNodePropertyLiteral(value, result, type) {
+    var fragment = ("\n<" + type + "><ogc:Literal>" + value + "</ogc:Literal></" + type + ">\n").trimStart();
+    result.fragment += fragment;
   }
 
   function addEmptyNode(result, type, attributes) {
-    var attributesText = stringifyAttributes(attributes); 
+    var attributesText = stringifyAttributes(attributes);
     var fragment = ("\n<" + type + attributesText + "/>\n").trimStart();
     result.fragment += fragment;
+  }
+
+  function stringifyAttributes(attributes) {
+    var attributeText = '';
+    if (attributes && typeof attributes == 'object' && !Array.isArray(attributes)) {
+      Object.keys(attributes).forEach(function (key) {
+        attributeText += " " + key + "='" + (attributes[key]) + "'";
+      });
+    }
+    return attributeText;
+  }
+
+  function mapSequence(obj, sequence) {
+    if (sequence) {
+      var map = new Map();
+      sequence.forEach(function (nodeName) {
+        if (obj[nodeName]) {
+          map.set(nodeName, obj[nodeName]);
+        }
+      });
+      return map;
+    }
+    return new Map(Object.entries(obj));
   }
 
   /**
@@ -514,6 +539,11 @@
       .replace(/([^0-9])([0-9])/g, '$1-$2')
       .replace(/-+/g, '-')
       .toLowerCase();
+  }
+
+  function fileNameToMimeType(fileName) {
+    var mimeTypes = { png: 'image/png', jpg: 'image/jpeg', gif: 'image/gif', svg: 'image/svg+xml' };
+    return mimeTypes[fileName.split('.').pop()];
   }
 
   var FilterBuilders = {
@@ -567,8 +597,8 @@
       addNode(obj, result, 'ogc:PropertyIsBetween');
     },
     propertyislike: function (obj, result) {
-      var attributes = { 'escape': obj.escapechar, 'singleChar': obj.singlechar, 'wildCard': obj.wildcard };
-      delete obj.escapechar; 
+      var attributes = { escape: obj.escapechar, singleChar: obj.singlechar, wildCard: obj.wildcard };
+      delete obj.escapechar;
       delete obj.singlechar;
       delete obj.wildcard;
       addNode(obj, result, 'ogc:PropertyIsLike', ['propertyname', 'literal'], attributes);
@@ -583,68 +613,70 @@
       addFeatureIdArray(members, result, 'ogc:FeatureId');
     },
     lowerboundary: function (obj, result) {
-      addNodeProperty(obj, result, 'ogc:LowerBoundary');
+      addNodePropertyLiteral(obj, result, 'ogc:LowerBoundary');
     },
     upperboundary: function (obj, result) {
-      addNodeProperty(obj, result, 'ogc:UpperBoundary');
+      addNodePropertyLiteral(obj, result, 'ogc:UpperBoundary');
     },
     type: ignore,
   };
 
-  var SymbBuilders =  {
+  var SymbBuilders = {
     polygonsymbolizer: function (obj, result) {
-      addNode(obj, result, 'sld:PolygonSymbolizer');
+      addNode(obj, result, 'sld:PolygonSymbolizer', ['geometry', 'fill', 'stroke']);
     },
     linesymbolizer: function (obj, result) {
-      addNode(obj, result, 'sld:LineSymbolizer');
+      addNode(obj, result, 'sld:LineSymbolizer', ['geometry', 'stroke']);
     },
     pointsymbolizer: function (obj, result) {
-      addNode(obj, result, 'sld:PointSymbolizer');
+      addNode(obj, result, 'sld:PointSymbolizer', ['geometry', 'graphic']);
     },
     textsymbolizer: function (obj, result) {
-      addNode(obj, result, 'sld:TextSymbolizer');
+      addNode(obj, result, 'sld:TextSymbolizer', ['geometry', 'label', 'font', 'labelplacement', 'halo', 'fill']);
     },
     fill: function (obj, result) {
-      addNode(obj, result, 'sld:Fill');
+      addNode(obj, result, 'sld:Fill', ['css']);
     },
     stroke: function (obj, result) {
-      addNode(obj, result, 'sld:Stroke');
+      addNode(obj, result, 'sld:Stroke', ['css']);
     },
     graphic: function (obj, result) {
-      addNode(obj, result, 'sld:Graphic');
+      addNode(obj, result, 'sld:Graphic', ['externalgraphic', 'mark', 'size']);
     },
     externalgraphic: function (obj, result) {
-      addNode(obj, result, 'sld:ExternalGraphic');
+      // Add format as Reader stripped it and it's required by SLD
+      obj.format = fileNameToMimeType(obj.onlineresource);
+      addNode(obj, result, 'sld:ExternalGraphic', ['onlineresource', 'format']);
     },
     mark: function (obj, result) {
-      addNode(obj, result, 'sld:Mark');
+      addNode(obj, result, 'sld:Mark', ['wellknownname', 'fill', 'stroke']);
     },
     label: function (value, result) {
       addNodeProperty(value, result, 'sld:Label');
     },
     halo: function (obj, result) {
-      addNode(obj, result, 'sld:Halo');
+      addNode(obj, result, 'sld:Halo', ['radius', 'fill']);
     },
     font: function (obj, result) {
-      addNode(obj, result, 'sld:Font');
+      addNode(obj, result, 'sld:Font', ['css']);
     },
     radius: function (value, result) {
       addNodeProperty(value, result, 'sld:Value');
     },
     labelplacement: function (obj, result) {
-      addNode(obj, result, 'sld:LabelPlacement');
+      addNode(obj, result, 'sld:LabelPlacement', ['pointplacement', 'lineplacement']);
     },
     pointplacement: function (obj, result) {
-      addNode(obj, result, 'sld:PointPlacement');
+      addNode(obj, result, 'sld:PointPlacement', ['anchorpoint', 'displacement', 'rotation']);
     },
     lineplacement: function (obj, result) {
-      addNode(obj, result, 'sld:LinePlacement');
+      addNode(obj, result, 'sld:LinePlacement', ['perpendicularoffset']);
     },
     perpendicularoffset: function (value, result) {
       addNodeProperty(value, result, 'sld:PerpendicularOffset');
     },
     anchorpoint: function (obj, result) {
-      addNode(obj, result, 'sld:AnchorPoint');
+      addNode(obj, result, 'sld:AnchorPoint', ['anchorpointx', 'anchorpointy']);
     },
     anchorpointx: function (value, result) {
       addNodeProperty(value, result, 'sld:AnchorPointX');
@@ -656,7 +688,7 @@
       addNodeProperty(value, result, 'sld:Rotation');
     },
     displacement: function (obj, result) {
-      addNode(obj, result, 'sld:Displacement');
+      addNode(obj, result, 'sld:Displacement', ['displacementx', 'displacementy']);
     },
     displacementx: function (value, result) {
       addNodeProperty(value, result, 'sld:DisplacementX');
@@ -674,11 +706,13 @@
     //  NOT YET
     // }
     onlineresource: function (obj, result) {
-      //function addEmptyNode(result, type, attributes) {
       var attributes = {
-        'xlink:href': obj
+        'xlink:href': obj,
       };
       addEmptyNode(result, 'sld:OnlineResource', attributes);
+    },
+    format: function (obj, result) {
+      addNodeProperty(obj, result, 'sld:Format');
     },
     css: function (members, result) {
       addParameterNode(members, result, 'Css');
@@ -691,16 +725,30 @@
   var builders = Object.assign(
     {
       layers: function (members, result) {
-        addNodeArray(members, result, 'sld:NamedLayer');
+        addNodeArray(members, result, 'sld:NamedLayer', ['name', 'styles']);
       },
       styles: function (members, result) {
-        addNodeArray(members, result, 'sld:UserStyle');
+        addNodeArray(members, result, 'sld:UserStyle', ['name', 'abstact', 'default', 'featuretypestyles']);
       },
       featuretypestyles: function (members, result) {
-        addNodeArray(members, result, 'sld:FeatureTypeStyle');
+        addNodeArray(members, result, 'sld:FeatureTypeStyle', ['name', 'rules']);
       },
       rules: function (members, result) {
-        addNodeArray(members, result, 'sld:Rule');
+        addNodeArray(
+          members,
+          result,
+          'sld:Rule',
+          [
+            'name',
+            'filter',
+            'elsefilter',
+            'minscaledenominator',
+            'maxscaledenominator',
+            'linesymbolizer',
+            'pointsymbolizer',
+            'polygonsymbolizer',
+            'textsymbolizer']
+        );
       },
       name: function (value, result) {
         addNodeProperty(value, result, 'sld:Name');
@@ -725,7 +773,8 @@
     return (obj.type && filterTypes.includes(obj.type));
   }
 
-  // Filters follow a different pattern, the sld type is a property rather than the name so we need to remap them.
+  // Filters follow a different pattern,
+  // the sld type is a property rather than the name so we need to remap them.
   function readFilter(obj, result) {
     var type = obj.type;
     if (type == 'comparison') {
@@ -743,12 +792,13 @@
   }
 
   function readObj(obj, result, sequence) {
+    var map = mapSequence(obj, sequence);
     if (isFilter(obj)) {
       readFilter(obj, result);
     } else {
-      Object.keys(obj).forEach(function (key) {
+      map.forEach(function (value, key) {
         try {
-          builders[key](obj[key], result);
+          builders[key](value, result);
         } catch (e) {
           throw new Error(("Key: " + key + ". " + (e.message)));
         }
@@ -770,13 +820,13 @@
   function Builder(obj) {
     var version = obj.version || '1.0.0';
     var result = { fragment: '' };
-    readObj(obj, result);
+    addNodeArray(obj.layers, result, 'sld:NamedLayer');
 
     var fragment = "<sld:StyledLayerDescriptor version=\"" + version + "\"\n                        xmlns:sld=\"http://www.opengis.net/sld\"\n                        xmlns:ogc=\"http://www.opengis.net/ogc\"\n                        xmlns:gml=\"http://www.opengis.net/gml\"\n                        xmlns:xlink=\"http://www.w3.org/1999/xlink\"\n                        xmlns:xsi=\"http://www.w3.org/2001/XMLSchema-instance\"\n                        xsi:schemaLocation=\"http://www.opengis.net/sld http://schemas.opengis.net/sld/" + version + "/StyledLayerDescriptor.xsd\">\n                        " + (result.fragment) + "\n                    </sld:StyledLayerDescriptor>";
 
     // Strip the empty white lines - speed vs readablity trade off
     var prettyXml = prettifyXml(fragment);
-    return ("<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n" + prettyXml);
+    return ("<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n" + fragment);
   }
 
   function propertyIsLessThan(comparison, value) {

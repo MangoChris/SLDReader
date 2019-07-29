@@ -6,8 +6,8 @@
     xmlns:xlink="http://www.w3.org/1999/xlink"
     xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
     xsi:schemaLocation="http://www.opengis.net/sld http://schemas.opengis.net/sld/1.0.0/StyledLayerDescriptor.xsd">
-	<sld:NamedLayer>
-		<sld:Name>WaterBodies</sld:Name>
+	<!--<sld:NamedLayer>-->
+		<!--<sld:Name>WaterBodies</sld:Name>-->
 		<!--<sld:UserStyle>-->
 			<!--<sld:Name>Default Styler</sld:Name>-->
 			<!--<sld:Title>Default Styler (zoom in to see more objects)</sld:Title>-->
@@ -407,34 +407,34 @@
 			<!--</sld:FeatureTypeStyle>-->
 		<!--</sld:UserStyle>-->
 
-		<sld:UserStyle>
-			<sld:Name>Styler Test PropertyIsLike</sld:Name>
-			<sld:Title>Styler Test PropertyIsLike</sld:Title>
-			<sld:FeatureTypeStyle>
-				<sld:Name>attribute filter type</sld:Name>
-				<sld:Title>attribute filter type</sld:Title>
-				<sld:FeatureTypeName>Feature</sld:FeatureTypeName>
-				<sld:SemanticTypeIdentifier>generic:geometry</sld:SemanticTypeIdentifier>
-				<sld:Rule>
-					<sld:Name>PropertyIsLike</sld:Name>
-					<sld:Title>PropertyIsLike</sld:Title>
-					<sld:Abstract>PropertyIsLike</sld:Abstract>
-					<ogc:Filter>
-						<ogc:PropertyIsLike wildCard='*' singleChar='.' escape='!'>
-							<ogc:PropertyName>AREA</ogc:PropertyName>
-							<ogc:Literal>106774*</ogc:Literal>
-						</ogc:PropertyIsLike>
-					</ogc:Filter>
-					<sld:PolygonSymbolizer>
-						<sld:Fill>
-							<sld:CssParameter name="fill">
-								<ogc:Literal>green</ogc:Literal>
-							</sld:CssParameter>
-						</sld:Fill>
-					</sld:PolygonSymbolizer>
-				</sld:Rule>
-			</sld:FeatureTypeStyle>
-		</sld:UserStyle>
+		<!--<sld:UserStyle>-->
+			<!--<sld:Name>Styler Test PropertyIsLike</sld:Name>-->
+			<!--<sld:Title>Styler Test PropertyIsLike</sld:Title>-->
+			<!--<sld:FeatureTypeStyle>-->
+				<!--<sld:Name>attribute filter type</sld:Name>-->
+				<!--<sld:Title>attribute filter type</sld:Title>-->
+				<!--<sld:FeatureTypeName>Feature</sld:FeatureTypeName>-->
+				<!--<sld:SemanticTypeIdentifier>generic:geometry</sld:SemanticTypeIdentifier>-->
+				<!--<sld:Rule>-->
+					<!--<sld:Name>PropertyIsLike</sld:Name>-->
+					<!--<sld:Title>PropertyIsLike</sld:Title>-->
+					<!--<sld:Abstract>PropertyIsLike</sld:Abstract>-->
+					<!--<ogc:Filter>-->
+						<!--<ogc:PropertyIsLike wildCard='*' singleChar='.' escape='!'>-->
+							<!--<ogc:PropertyName>AREA</ogc:PropertyName>-->
+							<!--<ogc:Literal>106774*</ogc:Literal>-->
+						<!--</ogc:PropertyIsLike>-->
+					<!--</ogc:Filter>-->
+					<!--<sld:PolygonSymbolizer>-->
+						<!--<sld:Fill>-->
+							<!--<sld:CssParameter name="fill">-->
+								<!--<ogc:Literal>green</ogc:Literal>-->
+							<!--</sld:CssParameter>-->
+						<!--</sld:Fill>-->
+					<!--</sld:PolygonSymbolizer>-->
+				<!--</sld:Rule>-->
+			<!--</sld:FeatureTypeStyle>-->
+		<!--</sld:UserStyle>-->
 
 		<!--<sld:UserStyle>-->
 			<!--<sld:Name>Styler Test PropertyIsBetween</sld:Name>-->
@@ -512,41 +512,41 @@
 		<!--</sld:UserStyle>-->
 	<!--</sld:NamedLayer>-->
 
-	<!--<sld:NamedLayer>-->
-		<!--<sld:Name>Cities</sld:Name>-->
-		<!--<sld:UserStyle>-->
-			<!--<sld:Name>DefaultCities</sld:Name>-->
-			<!--<sld:IsDefault>1</sld:IsDefault>-->
-			<!--<sld:FeatureTypeStyle>-->
-				<!--<sld:Rule>-->
-					<!--<ogc:Filter>-->
-						<!--<ogc:FeatureId fid="tasmania_cities.1"/>-->
-					<!--</ogc:Filter>-->
-					<!--<sld:PointSymbolizer>-->
-						<!--<sld:Graphic>-->
-							<!--<sld:ExternalGraphic>-->
-								<!--<sld:OnlineResource xlink:href="../img/marker.png" />-->
-								<!--<sld:Format>image/png</sld:Format>-->
-							<!--</sld:ExternalGraphic>-->
-							<!--<sld:Opacity>0.7</sld:Opacity>-->
-							<!--<sld:Size>14</sld:Size>-->
-						<!--</sld:Graphic>-->
-					<!--</sld:PointSymbolizer>-->
-				<!--</sld:Rule>-->
-				<!--<sld:Rule>-->
-					<!--<sld:ElseFilter/>-->
-					<!--<sld:PointSymbolizer>-->
-						<!--<sld:Graphic>-->
-							<!--<sld:Mark>-->
-								<!--<sld:WellKnownName>cross</sld:WellKnownName>-->
-							<!--</sld:Mark>-->
-							<!--<sld:Size>10</sld:Size>-->
-						<!--</sld:Graphic>-->
-					<!--</sld:PointSymbolizer>-->
-				<!--</sld:Rule>-->
-			<!--</sld:FeatureTypeStyle>-->
-		<!--</sld:UserStyle>-->
-	<!--</sld:NamedLayer>-->
+	<sld:NamedLayer>
+		<sld:Name>Cities</sld:Name>
+		<sld:UserStyle>
+			<sld:Name>DefaultCities</sld:Name>
+			<sld:IsDefault>1</sld:IsDefault>
+			<sld:FeatureTypeStyle>
+				<sld:Rule>
+					<ogc:Filter>
+						<ogc:FeatureId fid="tasmania_cities.1"/>
+					</ogc:Filter>
+					<sld:PointSymbolizer>
+						<sld:Graphic>
+							<sld:ExternalGraphic>
+								<sld:OnlineResource xlink:href="../img/marker.png" />
+								<sld:Format>image/png</sld:Format>
+							</sld:ExternalGraphic>
+							<sld:Opacity>0.7</sld:Opacity>
+							<sld:Size>14</sld:Size>
+						</sld:Graphic>
+					</sld:PointSymbolizer>
+				</sld:Rule>
+				<sld:Rule>
+					<sld:ElseFilter/>
+					<sld:PointSymbolizer>
+						<sld:Graphic>
+							<sld:Mark>
+								<sld:WellKnownName>cross</sld:WellKnownName>
+							</sld:Mark>
+							<sld:Size>10</sld:Size>
+						</sld:Graphic>
+					</sld:PointSymbolizer>
+				</sld:Rule>
+			</sld:FeatureTypeStyle>
+		</sld:UserStyle>
+	</sld:NamedLayer>
 
 	<!--<sld:NamedLayer>-->
 		<!--<sld:Name>Land</sld:Name>-->
@@ -580,6 +580,6 @@
 				<!--</sld:Rule>-->
 			<!--</sld:FeatureTypeStyle>-->
 		<!--</sld:UserStyle>-->
-	</sld:NamedLayer>
+	<!--</sld:NamedLayer>-->
 
 </sld:StyledLayerDescriptor>

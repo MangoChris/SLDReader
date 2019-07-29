@@ -16,13 +16,8 @@ module.exports = function kc(config) {
     files: [
       'node_modules/core-js/client/shim.min.js',
       {
-        pattern: 'test/**/Builder.test.js',
-        watched: true,
-      },
-      {
-        pattern: 'src/Builder.js',
-        watched: true,
-        included: false,
+        pattern: 'test/**/*.test.js',
+        watched: false,
       },
     ],
 
