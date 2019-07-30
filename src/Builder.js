@@ -6,6 +6,227 @@
  *    ...
  */
 
+let version;
+const SLD11 = ['StyledLayerDescriptor', 'NameLayer', 'UserLayer', 'Value', 'UserStyle', 'IsDefault'];
+
+const FilterBuilders = {
+  abstract: (value, result) => {
+    addNodeProperty(value, result, ns('Abstract'));
+  },
+  default: (value, result) => {
+    if (value) addNodeProperty(1, result, ns('IsDefault'));
+  },
+  elsefilter: (value, result) => {
+    addEmptyNode(result, ns('ElseFilter'));
+  },
+  size: (obj, result) => {
+    addNodeProperty(obj, result, ns('Size'));
+  },
+  wellknownname: (obj, result) => {
+    addNodeProperty(obj, result, ns('WellKnownName'));
+  },
+  version: ignore,
+  filter: (obj, result) => {
+    addNode(obj, result, 'ogc:Filter');
+  },
+  not: (obj, result) => {
+    addNode(obj, result, 'ogc:Not');
+  },
+  and: (obj, result) => {
+    addFilterArray(obj, result, 'ogc:And');
+  },
+  or: (obj, result) => {
+    addFilterArray(obj, result, 'ogc:Or');
+  },
+  propertyisequalto: (obj, result) => {
+    addNode(obj, result, 'ogc:PropertyIsEqualTo');
+  },
+  propertyisnotequalto: (obj, result) => {
+    addNode(obj, result, 'ogc:PropertyIsNotEqualTo');
+  },
+  propertyislessthan: (obj, result) => {
+    addNode(obj, result, 'ogc:PropertyIsLessThan');
+  },
+  propertyislessthanorequalto: (obj, result) => {
+    addNode(obj, result, 'ogc:PropertyIsLessThanOrEqualTo');
+  },
+  propertyisgreaterthan: (obj, result) => {
+    addNode(obj, result, 'ogc:PropertyIsGreaterThan');
+  },
+  propertyisgreaterthanorequalto: (obj, result) => {
+    addNode(obj, result, 'ogc:PropertyIsGreaterThanOrEqualTo');
+  },
+  propertyisbetween: (obj, result) => {
+    addNode(obj, result, 'ogc:PropertyIsBetween');
+  },
+  propertyislike: (obj, result) => {
+    const attributes = { escape: obj.escapechar, singleChar: obj.singlechar, wildCard: obj.wildcard };
+    delete obj.escapechar;
+    delete obj.singlechar;
+    delete obj.wildcard;
+    addNode(obj, result, 'ogc:PropertyIsLike', ['propertyname', 'literal'], attributes);
+  },
+  propertyname: (obj, result) => {
+    addNodeProperty(obj, result, 'ogc:PropertyName');
+  },
+  literal: (obj, result) => {
+    addNodeProperty(obj, result, 'ogc:Literal');
+  },
+  fids: (members, result) => {
+    addFeatureIdArray(members, result, 'ogc:FeatureId');
+  },
+  lowerboundary: (obj, result) => {
+    addNodePropertyLiteral(obj, result, 'ogc:LowerBoundary');
+  },
+  upperboundary: (obj, result) => {
+    addNodePropertyLiteral(obj, result, 'ogc:UpperBoundary');
+  },
+  type: ignore,
+};
+
+const SymbBuilders = {
+  polygonsymbolizer: (obj, result) => {
+    addNode(obj, result, ns('PolygonSymbolizer'), ['geometry', 'fill', 'stroke']);
+  },
+  linesymbolizer: (obj, result) => {
+    addNode(obj, result, ns('LineSymbolizer'), ['geometry', 'stroke']);
+  },
+  pointsymbolizer: (obj, result) => {
+    addNode(obj, result, ns('PointSymbolizer'), ['geometry', 'graphic']);
+  },
+  textsymbolizer: (obj, result) => {
+    addNode(obj, result, ns('TextSymbolizer'), ['geometry', 'label', 'font', 'labelplacement', 'halo', 'fill']);
+  },
+  fill: (obj, result) => {
+    addNode(obj, result, ns('Fill'));
+  },
+  stroke: (obj, result) => {
+    addNode(obj, result, ns('Stroke'));
+  },
+  graphic: (obj, result) => {
+    addNode(obj, result, ns('Graphic'), ['externalgraphic', 'mark', 'size']);
+  },
+  externalgraphic: (obj, result) => {
+    // Add format as Reader stripped it and it's required by SLD
+    obj.format = fileNameToMimeType(obj.onlineresource);
+    addNode(obj, result, ns('ExternalGraphic'), ['onlineresource', 'format']);
+  },
+  mark: (obj, result) => {
+    addNode(obj, result, ns('Mark'), ['wellknownname', 'fill', 'stroke']);
+  },
+  label: (value, result) => {
+    addNodeProperty(value, result, ns('Label'));
+  },
+  halo: (obj, result) => {
+    addNode(obj, result, ns('Halo'), ['radius', 'fill']);
+  },
+  font: (obj, result) => {
+    addNode(obj, result, ns('Font'));
+  },
+  radius: (value, result) => {
+    addNodeProperty(value, result, ns('Value'));
+  },
+  labelplacement: (obj, result) => {
+    addNode(obj, result, ns('LabelPlacement'), ['pointplacement', 'lineplacement']);
+  },
+  pointplacement: (obj, result) => {
+    addNode(obj, result, ns('PointPlacement'), ['anchorpoint', 'displacement', 'rotation']);
+  },
+  lineplacement: (obj, result) => {
+    addNode(obj, result, ns('LinePlacement'), ['perpendicularoffset']);
+  },
+  perpendicularoffset: (value, result) => {
+    addNodeProperty(value, result, ns('PerpendicularOffset'));
+  },
+  anchorpoint: (obj, result) => {
+    addNode(obj, result, ns('AnchorPoint'), ['anchorpointx', 'anchorpointy']);
+  },
+  anchorpointx: (value, result) => {
+    addNodeProperty(value, result, ns('AnchorPointX'));
+  },
+  anchorpointy: (value, result) => {
+    addNodeProperty(value, result, ns('AnchorPointY'));
+  },
+  rotation: (value, result) => {
+    addNodeProperty(value, result, ns('Rotation'));
+  },
+  displacement: (obj, result) => {
+    addNode(obj, result, ns('Displacement'), ['displacementx', 'displacementy']);
+  },
+  displacementx: (value, result) => {
+    addNodeProperty(value, result, ns('DisplacementX'));
+  },
+  displacementy: (value, result) => {
+    addNodeProperty(value, result, ns('DisplacementY'));
+  },
+  size: (value, result) => {
+    addNodeProperty(value, result, ns('Size'));
+  },
+  wellknownname: (value, result) => {
+    addNodeProperty(value, result, ns('WellKnownName'));
+  },
+  // vendoroptions: (members, result) => {
+  //  NOT YET
+  // }
+  onlineresource: (obj, result) => {
+    const attributes = {
+      'xlink:href': obj,
+    };
+    addEmptyNode(result, ns('OnlineResource'), attributes);
+  },
+  format: (obj, result) => {
+    addNodeProperty(obj, result, ns('Format'));
+  },
+  css: (members, result) => {
+    addParameterNode(members, result, ns('Css'));
+  },
+  svg: (members, result) => {
+    addParameterNode(members, result, ns('Svg'));
+  },
+};
+
+const builders = Object.assign(
+  {
+    layers: (members, result) => {
+      addNodeArray(members, result, ns('NamedLayer'), ['name', 'styles']);
+    },
+    styles: (members, result) => {
+      addNodeArray(members, result, ns('UserStyle'), ['name', 'abstact', 'default', 'featuretypestyles']);
+    },
+    featuretypestyles: (members, result) => {
+      addNodeArray(members, result, ns('FeatureTypeStyle'), ['name', 'rules']);
+    },
+    rules: (members, result) => {
+      addNodeArray(
+        members,
+        result,
+        ns('Rule'),
+        [
+          'name',
+          'filter',
+          'elsefilter',
+          'minscaledenominator',
+          'maxscaledenominator',
+          'linesymbolizer',
+          'pointsymbolizer',
+          'polygonsymbolizer',
+          'textsymbolizer']
+      );
+    },
+    name: (value, result) => {
+      addNodeProperty(value, result, ns('Name'));
+    },
+    maxscaledenominator: (value, result) => {
+      addNodeProperty(value, result, ns('MaxScaleDenominator'));
+    },
+    minscaledenominator: (value, result) => {
+      addNodeProperty(value, result, ns('MinScaleDenominator'));
+    },
+  },
+  FilterBuilders,
+  SymbBuilders
+);
+
 function addNodeArray(members, result, type, sequence) {
   for (let i = 0; i < members.length; i += 1) {
     const child = { fragment: '' };
@@ -67,9 +288,9 @@ function addParameterNode(members, result, type) {
 
 function parameter(key, value, result, type) {
   const fragment = `
-<sld:${type}Parameter name='${camelCaseToDash(key)}'>
+<${type}Parameter name='${camelCaseToDash(key)}'>
     <ogc:Literal>${value}</ogc:Literal>
-</sld:${type}Parameter>\n`.trimStart();
+</${type}Parameter>\n`.trimStart();
   result.fragment += fragment;
 }
 
@@ -137,223 +358,10 @@ function fileNameToMimeType(fileName) {
   return mimeTypes[fileName.split('.').pop()];
 }
 
-const FilterBuilders = {
-  abstract: (value, result) => {
-    addNodeProperty(value, result, 'sld:Abstract');
-  },
-  default: (value, result) => {
-    if (value) addNodeProperty(1, result, 'sld:IsDefault');
-  },
-  elsefilter: (value, result) => {
-    addEmptyNode(result, 'sld:ElseFilter');
-  },
-  size: (obj, result) => {
-    addNodeProperty(obj, result, 'sld:Size');
-  },
-  wellknownname: (obj, result) => {
-    addNodeProperty(obj, result, 'sld:WellKnownName');
-  },
-  version: ignore,
-  filter: (obj, result) => {
-    addNode(obj, result, 'ogc:Filter');
-  },
-  not: (obj, result) => {
-    addNode(obj, result, 'ogc:Not');
-  },
-  and: (obj, result) => {
-    addFilterArray(obj, result, 'ogc:And');
-  },
-  or: (obj, result) => {
-    addFilterArray(obj, result, 'ogc:Or');
-  },
-  propertyisequalto: (obj, result) => {
-    addNode(obj, result, 'ogc:PropertyIsEqualTo');
-  },
-  propertyisnotequalto: (obj, result) => {
-    addNode(obj, result, 'ogc:PropertyIsNotEqualTo');
-  },
-  propertyislessthan: (obj, result) => {
-    addNode(obj, result, 'ogc:PropertyIsLessThan');
-  },
-  propertyislessthanorequalto: (obj, result) => {
-    addNode(obj, result, 'ogc:PropertyIsLessThanOrEqualTo');
-  },
-  propertyisgreaterthan: (obj, result) => {
-    addNode(obj, result, 'ogc:PropertyIsGreaterThan');
-  },
-  propertyisgreaterthanorequalto: (obj, result) => {
-    addNode(obj, result, 'ogc:PropertyIsGreaterThanOrEqualTo');
-  },
-  propertyisbetween: (obj, result) => {
-    addNode(obj, result, 'ogc:PropertyIsBetween');
-  },
-  propertyislike: (obj, result) => {
-    const attributes = { escape: obj.escapechar, singleChar: obj.singlechar, wildCard: obj.wildcard };
-    delete obj.escapechar;
-    delete obj.singlechar;
-    delete obj.wildcard;
-    addNode(obj, result, 'ogc:PropertyIsLike', ['propertyname', 'literal'], attributes);
-  },
-  propertyname: (obj, result) => {
-    addNodeProperty(obj, result, 'ogc:PropertyName');
-  },
-  literal: (obj, result) => {
-    addNodeProperty(obj, result, 'ogc:Literal');
-  },
-  fids: (members, result) => {
-    addFeatureIdArray(members, result, 'ogc:FeatureId');
-  },
-  lowerboundary: (obj, result) => {
-    addNodePropertyLiteral(obj, result, 'ogc:LowerBoundary');
-  },
-  upperboundary: (obj, result) => {
-    addNodePropertyLiteral(obj, result, 'ogc:UpperBoundary');
-  },
-  type: ignore,
-};
-
-const SymbBuilders = {
-  polygonsymbolizer: (obj, result) => {
-    addNode(obj, result, 'sld:PolygonSymbolizer', ['geometry', 'fill', 'stroke']);
-  },
-  linesymbolizer: (obj, result) => {
-    addNode(obj, result, 'sld:LineSymbolizer', ['geometry', 'stroke']);
-  },
-  pointsymbolizer: (obj, result) => {
-    addNode(obj, result, 'sld:PointSymbolizer', ['geometry', 'graphic']);
-  },
-  textsymbolizer: (obj, result) => {
-    addNode(obj, result, 'sld:TextSymbolizer', ['geometry', 'label', 'font', 'labelplacement', 'halo', 'fill']);
-  },
-  fill: (obj, result) => {
-    addNode(obj, result, 'sld:Fill', ['css']);
-  },
-  stroke: (obj, result) => {
-    addNode(obj, result, 'sld:Stroke', ['css']);
-  },
-  graphic: (obj, result) => {
-    addNode(obj, result, 'sld:Graphic', ['externalgraphic', 'mark', 'size']);
-  },
-  externalgraphic: (obj, result) => {
-    // Add format as Reader stripped it and it's required by SLD
-    obj.format = fileNameToMimeType(obj.onlineresource);
-    addNode(obj, result, 'sld:ExternalGraphic', ['onlineresource', 'format']);
-  },
-  mark: (obj, result) => {
-    addNode(obj, result, 'sld:Mark', ['wellknownname', 'fill', 'stroke']);
-  },
-  label: (value, result) => {
-    addNodeProperty(value, result, 'sld:Label');
-  },
-  halo: (obj, result) => {
-    addNode(obj, result, 'sld:Halo', ['radius', 'fill']);
-  },
-  font: (obj, result) => {
-    addNode(obj, result, 'sld:Font', ['css']);
-  },
-  radius: (value, result) => {
-    addNodeProperty(value, result, 'sld:Value');
-  },
-  labelplacement: (obj, result) => {
-    addNode(obj, result, 'sld:LabelPlacement', ['pointplacement', 'lineplacement']);
-  },
-  pointplacement: (obj, result) => {
-    addNode(obj, result, 'sld:PointPlacement', ['anchorpoint', 'displacement', 'rotation']);
-  },
-  lineplacement: (obj, result) => {
-    addNode(obj, result, 'sld:LinePlacement', ['perpendicularoffset']);
-  },
-  perpendicularoffset: (value, result) => {
-    addNodeProperty(value, result, 'sld:PerpendicularOffset');
-  },
-  anchorpoint: (obj, result) => {
-    addNode(obj, result, 'sld:AnchorPoint', ['anchorpointx', 'anchorpointy']);
-  },
-  anchorpointx: (value, result) => {
-    addNodeProperty(value, result, 'sld:AnchorPointX');
-  },
-  anchorpointy: (value, result) => {
-    addNodeProperty(value, result, 'sld:AnchorPointY');
-  },
-  rotation: (value, result) => {
-    addNodeProperty(value, result, 'sld:Rotation');
-  },
-  displacement: (obj, result) => {
-    addNode(obj, result, 'sld:Displacement', ['displacementx', 'displacementy']);
-  },
-  displacementx: (value, result) => {
-    addNodeProperty(value, result, 'sld:DisplacementX');
-  },
-  displacementy: (value, result) => {
-    addNodeProperty(value, result, 'sld:DisplacementY');
-  },
-  size: (value, result) => {
-    addNodeProperty(value, result, 'sld:Size');
-  },
-  wellknownname: (value, result) => {
-    addNodeProperty(value, result, 'sld:WellKnownName');
-  },
-  // vendoroptions: (members, result) => {
-  //  NOT YET
-  // }
-  onlineresource: (obj, result) => {
-    const attributes = {
-      'xlink:href': obj,
-    };
-    addEmptyNode(result, 'sld:OnlineResource', attributes);
-  },
-  format: (obj, result) => {
-    addNodeProperty(obj, result, 'sld:Format');
-  },
-  css: (members, result) => {
-    addParameterNode(members, result, 'Css');
-  },
-  svg: (members, result) => {
-    addParameterNode(members, result, 'Svg');
-  },
-};
-
-const builders = Object.assign(
-  {
-    layers: (members, result) => {
-      addNodeArray(members, result, 'sld:NamedLayer', ['name', 'styles']);
-    },
-    styles: (members, result) => {
-      addNodeArray(members, result, 'sld:UserStyle', ['name', 'abstact', 'default', 'featuretypestyles']);
-    },
-    featuretypestyles: (members, result) => {
-      addNodeArray(members, result, 'sld:FeatureTypeStyle', ['name', 'rules']);
-    },
-    rules: (members, result) => {
-      addNodeArray(
-        members,
-        result,
-        'sld:Rule',
-        [
-          'name',
-          'filter',
-          'elsefilter',
-          'minscaledenominator',
-          'maxscaledenominator',
-          'linesymbolizer',
-          'pointsymbolizer',
-          'polygonsymbolizer',
-          'textsymbolizer']
-      );
-    },
-    name: (value, result) => {
-      addNodeProperty(value, result, 'sld:Name');
-    },
-    maxscaledenominator: (value, result) => {
-      addNodeProperty(value, result, 'sld:MaxScaleDenominator');
-    },
-    minscaledenominator: (value, result) => {
-      addNodeProperty(value, result, 'sld:MinScaleDenominator');
-    },
-  },
-  FilterBuilders,
-  SymbBuilders
-);
+function ns(name) {
+  if (version == '1.0.0' || SLD11.includes(name)) return name;
+  return `se:${name}`;
+}
 
 function ignore() {
   // do nonthing
@@ -416,22 +424,22 @@ function prettifyXml(sourceXml) {
   return resultXml;
 }
 
-export default function Builder(obj) {
-  const version = obj.version || '1.0.0';
-  const result = { fragment: '' };
-  addNodeArray(obj.layers, result, 'sld:NamedLayer');
 
-  const fragment = `<sld:StyledLayerDescriptor version="${version}"
-                        xmlns:sld="http://www.opengis.net/sld"
+export default function Builder(obj) {
+  version = obj.version || '1.0.0';
+  const result = { fragment: '' };
+  addNodeArray(obj.layers, result, 'NamedLayer');
+  const symbolizer = (obj.version == '1.1.0') ? ' xmlns:se="http://www.opengis.net/se"' : '';
+  const fragment = `<StyledLayerDescriptor version="${version}"
+                        xmlns="http://www.opengis.net/sld"
                         xmlns:ogc="http://www.opengis.net/ogc"
                         xmlns:gml="http://www.opengis.net/gml"
                         xmlns:xlink="http://www.w3.org/1999/xlink"
                         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-                        xsi:schemaLocation="http://www.opengis.net/sld http://schemas.opengis.net/sld/${version}/StyledLayerDescriptor.xsd">
+                        xsi:schemaLocation="http://www.opengis.net/sld http://schemas.opengis.net/sld/${version}/StyledLayerDescriptor.xsd"${symbolizer}>
                         ${result.fragment}
-                    </sld:StyledLayerDescriptor>`;
+                    </StyledLayerDescriptor>`;
 
   // Strip the empty white lines - speed vs readablity trade off
-  const prettyXml = prettifyXml(fragment);
-  return `<?xml version="1.0" encoding="UTF-8"?>\n${fragment}`;
+  return prettifyXml(fragment);
 }

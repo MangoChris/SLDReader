@@ -18,7 +18,7 @@ const editor2 = CodeMirror.fromTextArea(document.getElementById('sld2'), {
   gutters: ["CodeMirror-linenumbers", "CodeMirror-foldgutter"]
 });
 
-fetch('assets/test.xml')
+fetch('assets/test11.xml')
   .then(response => response.text())
   .then(text => editor.setValue(text));
 
