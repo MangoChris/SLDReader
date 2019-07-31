@@ -177,12 +177,21 @@ const SymbBuilders = {
   format: (obj, result) => {
     addNodeProperty(obj, result, ns('Format'));
   },
-  css: (members, result) => {
-    addParameterNode(members, result, ns('Css'));
+  styling: (members, result) => {
+    let nodeName;
+    if (version == '1.0.0') {
+      nodeName = 'Css';
+    } else {
+      nodeName = 'Svg';
+    }
+    addParameterNode(members, result, ns(nodeName));
   },
-  svg: (members, result) => {
-    addParameterNode(members, result, ns('Svg'));
-  },
+  //css: (members, result) => {
+    //addParameterNode(members, result, ns('Css'));
+  //},
+  //svg: (members, result) => {
+    //addParameterNode(members, result, ns('Svg'));
+  //},
 };
 
 const builders = Object.assign(
@@ -288,9 +297,7 @@ function addParameterNode(members, result, type) {
 
 function parameter(key, value, result, type) {
   const fragment = `
-<${type}Parameter name='${camelCaseToDash(key)}'>
-    <ogc:Literal>${value}</ogc:Literal>
-</${type}Parameter>\n`.trimStart();
+<${type}Parameter name='${camelCaseToDash(key)}'>${value}</${type}Parameter>\n`.trimStart();
   result.fragment += fragment;
 }
 

@@ -97,11 +97,11 @@
    */
   function parameters(element, obj, prop) {
     var propnames = {
-      CssParameter: 'css',
-      SvgParameter: 'svg',
+      CssParameter: 'styling',
+      SvgParameter: 'styling',
       VendorOption: 'vendoroption',
     };
-    var propname = propnames[prop] || 'css';
+    var propname = propnames[prop] || 'styling';
     obj[propname] = obj[propname] || {};
     var name = element
       .getAttribute('name')
@@ -602,12 +602,21 @@
     format: function (obj, result) {
       addNodeProperty(obj, result, ns('Format'));
     },
-    css: function (members, result) {
-      addParameterNode(members, result, ns('Css'));
+    styling: function (members, result) {
+      var nodeName;
+      if (version == '1.0.0') {
+        nodeName = 'Css';
+      } else {
+        nodeName = 'Svg';
+      }
+      addParameterNode(members, result, ns(nodeName));
     },
-    svg: function (members, result) {
-      addParameterNode(members, result, ns('Svg'));
-    },
+    //css: (members, result) => {
+      //addParameterNode(members, result, ns('Css'));
+    //},
+    //svg: (members, result) => {
+      //addParameterNode(members, result, ns('Svg'));
+    //},
   };
 
   var builders = Object.assign(
@@ -702,7 +711,7 @@
   }
 
   function parameter(key, value, result, type) {
-    var fragment = ("\n<" + type + "Parameter name='" + (camelCaseToDash(key)) + "'>\n    <ogc:Literal>" + value + "</ogc:Literal>\n</" + type + "Parameter>\n").trimStart();
+    var fragment = ("\n<" + type + "Parameter name='" + (camelCaseToDash(key)) + "'>" + value + "</" + type + "Parameter>\n").trimStart();
     result.fragment += fragment;
   }
 
@@ -836,6 +845,10 @@
     // Strip the empty white lines - speed vs readablity trade off
     return prettifyXml(fragment);
   }
+
+  var IMAGE_LOADING = 'IMAGE_LOADING';
+  var IMAGE_LOADED = 'IMAGE_LOADED';
+  var IMAGE_ERROR = 'IMAGE_ERROR';
 
   function propertyIsLessThan(comparison, value) {
     return (
@@ -1079,6 +1092,7 @@
     return true;
   }
 
+  /* eslint-disable no-underscore-dangle */
   /**
    * get all layer names in sld
    * @param {StyledLayerDescriptor} sld
@@ -1158,6 +1172,79 @@
   }
 
   /**
+   * Go through all rules with an external graphic matching the image url
+   * and update the __loadingState metadata for the symbolizers with the new imageLoadState.
+   * This action replaces symbolizers with new symbolizers if they get a new __loadingState.
+   * @param {object} featureTypeStyle A feature type style object.
+   * @param {string} imageUrl The image url.
+   * @param {string} imageLoadState One of 'IMAGE_LOADING', 'IMAGE_LOADED', 'IMAGE_ERROR'.
+   */
+  function updateExternalGraphicRules(
+    featureTypeStyle,
+    imageUrl,
+    imageLoadState
+  ) {
+    // Go through all rules with an external graphic matching the image url
+    // and update the __loadingState metadata for the symbolizers with the new imageLoadState.
+    if (!featureTypeStyle.rules) {
+      return;
+    }
+
+    featureTypeStyle.rules.forEach(function (rule) {
+      if (!(rule.pointsymbolizer && rule.pointsymbolizer.graphic)) {
+        return;
+      }
+
+      var ref = rule.pointsymbolizer;
+      var graphic = ref.graphic;
+      var externalgraphic = graphic.externalgraphic;
+      if (
+        externalgraphic &&
+        externalgraphic.onlineresource === imageUrl &&
+        rule.pointsymbolizer.__loadingState !== imageLoadState
+      ) {
+        rule.pointsymbolizer = Object.assign({}, rule.pointsymbolizer, {
+          __loadingState: imageLoadState,
+        });
+      }
+    });
+  }
+
+  function loadExternalGraphic(
+    imageUrl,
+    imageCache,
+    imageLoadState,
+    featureTypeStyle,
+    imageLoadedCallback
+  ) {
+    var image = new Image();
+
+    image.onload = function () {
+      imageCache[imageUrl] = {
+        url: imageUrl,
+        image: image,
+        width: image.naturalWidth,
+        height: image.naturalHeight,
+      };
+      updateExternalGraphicRules(featureTypeStyle, imageUrl, IMAGE_LOADED);
+      imageLoadState[imageUrl] = IMAGE_LOADED;
+      if (typeof imageLoadedCallback === 'function') {
+        imageLoadedCallback(imageUrl);
+      }
+    };
+
+    image.onerror = function () {
+      updateExternalGraphicRules(featureTypeStyle, imageUrl, IMAGE_ERROR);
+      imageLoadState[imageUrl] = IMAGE_ERROR;
+      if (typeof imageLoadedCallback === 'function') {
+        imageLoadedCallback();
+      }
+    };
+
+    image.src = imageUrl;
+  }
+
+  /**
    * Get styling from rules per geometry type
    * @param  {Rule[]} rules [description]
    * @return {GeometryStyles}
@@ -1199,6 +1286,55 @@
    * @property {PointSymbolizer[]} point pointsymbolizers, same as graphic prop from PointSymbolizer
    */
 
+  /* eslint-disable no-continue */
+
+  // Global image cache. A map of image Url -> {
+  //   url: image url,
+  //   image: an Image instance containing image data,
+  //   width: image width in pixels,
+  //   height: image height in pixels
+  // }
+  var imageCache = {};
+
+  var defaultPointStyle = new Style({
+    image: new Circle({
+      radius: 8,
+      fill: new Fill({
+        color: 'blue',
+        fillOpacity: 0.7,
+      }),
+    }),
+  });
+
+  var imageLoadingStyle = new Style({
+    image: new Circle({
+      radius: 5,
+      fill: new Fill({
+        color: '#DDDDDD',
+      }),
+      stroke: new Stroke({
+        width: 1,
+        color: '#888888',
+      }),
+    }),
+  });
+
+  var imageErrorStyle = new Style({
+    image: new RegularShape({
+      angle: Math.PI / 4,
+      fill: new Fill({
+        color: 'red',
+      }),
+      points: 4,
+      radius1: 8,
+      radius2: 0,
+      stroke: new Stroke({
+        color: 'red',
+        width: 4,
+      }),
+    }),
+  });
+
   /**
    * @private
    * @param  {string} hex   eg #AA00FF
@@ -1216,8 +1352,8 @@
   }
 
   function polygonStyle(style) {
-    var stroke = style.stroke && (style.stroke.css || style.stroke.svg);
-    var fill = style.fill && (style.fill.css || style.fill.svg);
+    var stroke = style.stroke && style.stroke.styling;
+    var fill = style.fill && style.fill.styling;
     return new Style({
       fill:
         fill &&
@@ -1253,7 +1389,7 @@
   function lineStyle(linesymbolizer) {
     var style = {};
     if (linesymbolizer.stroke) {
-      style = linesymbolizer.stroke.css || linesymbolizer.stroke.svg;
+      style = linesymbolizer.stroke.styling;
     }
     return new Style({
       stroke: new Stroke({
@@ -1271,6 +1407,28 @@
   }
 
   /**
+   * Create an OL Icon style for an external graphic.
+   * The Graphic must be already loaded and present in the global imageCache.
+   * @param {string} imageUrl Url of the external graphic.
+   * @param {number} size Requested size in pixels.
+   */
+  function createCachedImageStyle(imageUrl, size) {
+    var ref = imageCache[imageUrl];
+    var image = ref.image;
+    var width = ref.width;
+    var height = ref.height;
+    var maxSide = Math.max(width, height);
+    return new Style({
+      image: new Icon({
+        img: image,
+        imgSize: [width, height],
+        // Calculate scale so the image will be resized to the requested size.
+        scale: size / maxSide || 1,
+      }),
+    });
+  }
+
+  /**
    * @private
    * @param  {PointSymbolizer} pointsymbolizer [description]
    * @return {object} openlayers style
@@ -1278,20 +1436,32 @@
   function pointStyle(pointsymbolizer) {
     var style = pointsymbolizer.graphic;
     if (style.externalgraphic && style.externalgraphic.onlineresource) {
-      return new Style({
-        image: new Icon({ src: style.externalgraphic.onlineresource }),
-      });
+      // Check symbolizer metadata to see if the image has already been loaded.
+      switch (pointsymbolizer.__loadingState) {
+        case IMAGE_LOADED:
+          return createCachedImageStyle(
+            style.externalgraphic.onlineresource,
+            style.size
+          );
+        case IMAGE_LOADING:
+          return imageLoadingStyle;
+        case IMAGE_ERROR:
+          return imageErrorStyle;
+        default:
+          // A symbolizer should have loading state metadata, but return IMAGE_LOADING just in case.
+          return imageLoadingStyle;
+      }
     }
     if (style.mark) {
       var ref = style.mark;
       var fill = ref.fill;
       var stroke = ref.stroke;
-      var fillColor = (fill && fill.css && fill.css.fill) || 'blue';
+      var fillColor = (fill && fill.styling && fill.styling.fill) || 'blue';
       fill = new Fill({
         color: fillColor,
       });
-      if (stroke && !(Number(stroke.css.strokeWidth) === 0)) {
-        var ref$1 = stroke.css;
+      if (stroke && !(Number(stroke.styling.strokeWidth) === 0)) {
+        var ref$1 = stroke.styling;
         var cssStroke = ref$1.stroke;
         var cssStrokeWidth = ref$1.strokeWidth;
         stroke = new Stroke({
@@ -1420,19 +1590,19 @@
       }, '');
 
       var fill = textsymbolizer.fill
-        ? textsymbolizer.fill.css || textsymbolizer.fill.svg
+        ? textsymbolizer.fill.styling
         : {};
       var halo =
         textsymbolizer.halo && textsymbolizer.halo.fill
-          ? textsymbolizer.halo.fill.css || textsymbolizer.halo.fill.svg
+          ? textsymbolizer.halo.fill.styling
           : {};
       var haloRadius =
         textsymbolizer.halo && textsymbolizer.halo.radius
           ? parseFloat(textsymbolizer.halo.radius)
           : 1;
       var ref =
-        textsymbolizer.font && textsymbolizer.font.css
-          ? textsymbolizer.font.css
+        textsymbolizer.font && textsymbolizer.font.styling
+          ? textsymbolizer.font.styling
           : {};
       var fontFamily = ref.fontFamily; if ( fontFamily === void 0 ) fontFamily = 'sans-serif';
       var fontSize = ref.fontSize; if ( fontSize === void 0 ) fontSize = 10;
@@ -1476,14 +1646,14 @@
           stroke: textsymbolizer.halo
             ? new Stroke({
               color:
-                halo.fillOpacity && halo.fill && halo.fill.slice(0, 1) === '#'
-                  ? hexToRGB(halo.fill, halo.fillOpacity)
-                  : halo.fill,
+                  halo.fillOpacity && halo.fill && halo.fill.slice(0, 1) === '#'
+                    ? hexToRGB(halo.fill, halo.fillOpacity)
+                    : halo.fill,
               // wrong position width radius equal to 2 or 4
               width:
-                (haloRadius === 2 || haloRadius === 4
-                  ? haloRadius - 0.00001
-                  : haloRadius) * 2,
+                  (haloRadius === 2 || haloRadius === 4
+                    ? haloRadius - 0.00001
+                    : haloRadius) * 2,
             })
             : undefined,
           fill: new Fill({
@@ -1533,15 +1703,7 @@
   var cachedLineStyle = memoize(lineStyle);
   var cachedPolygonStyle = memoize(polygonStyle);
 
-  var defaultStyles = [
-    new Style({
-      image: new Circle({
-        radius: 2,
-        fill: new Fill({
-          color: 'blue',
-        }),
-      }),
-    }) ];
+  var defaultStyles = [defaultPointStyle];
 
   /**
    * Create openlayers style
@@ -1617,17 +1779,100 @@
   }
 
   /**
+   * Start loading images used in rules that have a pointsymbolizer with an externalgraphic.
+   * On image load start or load end, update __loadingState metadata of the symbolizers for that image url.
+   * @param {Array<object>} rules Array of SLD rule objects that pass the filter for a single feature.
+   * @param {FeatureTypeStyle} featureTypeStyle The feature type style object for a layer.
+   * @param {object} imageLoadState Cache of image load state: imageUrl -> IMAGE_LOADING | IMAGE_LOADED | IMAGE_ERROR.
+   * @param {Function} imageLoadedCallback Function to call when an image has loaded.
+   */
+  function processExternalGraphicSymbolizers(
+    rules,
+    featureTypeStyle,
+    imageLoadState,
+    imageLoadedCallback
+  ) {
+    // If a feature has an external graphic point symbolizer, the external image may
+    // * have never been requested before.
+    //   --> set __loadingState IMAGE_LOADING on the symbolizer and start loading the image.
+    //       When loading is complete, replace all point symbolizers using that image inside the featureTypeStyle
+    //       with new symbolizers with a new __loadingState. Also call options.imageLoadCallback if one has been provided.
+    // * be loading.
+    //   --> set __loadingState IMAGE_LOADING on the symbolizer if not already so.
+    // * be loaded and therefore present in the image cache.
+    //   --> set __loadingState IMAGE_LOADED on the symbolizer if not already so.
+    // * be in error. Error is a kind of loaded, but with an error icon style.
+    //   --> set __loadingState IMAGE_ERROR on the symbolizer if not already so.
+    for (var k = 0; k < rules.length; k += 1) {
+      var rule = rules[k];
+      if (
+        !(
+          rule.pointsymbolizer &&
+          rule.pointsymbolizer.graphic &&
+          rule.pointsymbolizer.graphic.externalgraphic
+        )
+      ) {
+        continue;
+      }
+
+      var ref = rule.pointsymbolizer.graphic;
+      var externalgraphic = ref.externalgraphic;
+      var imageUrl = externalgraphic.onlineresource;
+      if (!(imageUrl in imageLoadState)) {
+        // Start loading the image and set image load state on the symbolizer.
+        imageLoadState[imageUrl] = IMAGE_LOADING;
+        loadExternalGraphic(
+          imageUrl,
+          imageCache,
+          imageLoadState,
+          featureTypeStyle,
+          imageLoadedCallback
+        );
+        rule.pointsymbolizer = Object.assign({}, rule.pointsymbolizer, {
+          __loadingState: IMAGE_LOADING,
+        });
+      } else if (
+        // Change image load state on the symbolizer if it has changed in the meantime.
+        rule.pointsymbolizer.__loadingState !== imageLoadState[imageUrl]
+      ) {
+        rule.pointsymbolizer = Object.assign({}, rule.pointsymbolizer, {
+          __loadingState: imageLoadState[imageUrl],
+        });
+      }
+    }
+  }
+
+  /**
    * Create an OpenLayers style function from a FeatureTypeStyle object extracted from an SLD document.
+   *
+   * **Important!** When using externalGraphics for point styling, make sure to call .changed() on the layer
+   * inside options.imageLoadedCallback to immediately see the loaded image. If you do not do this, the
+   * image icon will only become visible the next time OpenLayers draws the layer (after pan or zoom).
    * @param {FeatureTypeStyle} featureTypeStyle Feature Type Style object.
    * @param {object} options Options
    * @param {function} options.convertResolution An optional function to convert the resolution in map units/pixel to resolution in meters/pixel.
    * When not given, the map resolution is used as-is.
+   * @param {function} options.imageLoadedCallback Optional callback that will be called with the url of an externalGraphic when
+   * an image has been loaded (successfully or not). Call .changed() inside the callback on the layer to see the loaded image.
    * @returns {Function} A function that can be set as style function on an OpenLayers vector style layer.
    * @example
-   * myOlVectorLayer.setStyle(SLDReader.createOlStyleFunction(featureTypeStyle));
+   * myOlVectorLayer.setStyle(SLDReader.createOlStyleFunction(featureTypeStyle, {
+   *   imageLoadedCallback: () => { myOlVectorLayer.changed(); }
+   * }));
    */
   function createOlStyleFunction(featureTypeStyle, options) {
     if ( options === void 0 ) options = {};
+
+    var imageLoadedCallback = options.imageLoadedCallback || (function () {});
+
+    // Keep image loading state separate from image cache.
+    // This makes it easier to detect whether a requested image is already loading.
+    var imageLoadState = {};
+
+    // Important: if image cache already has loaded images, mark these as loaded in imageLoadState!
+    Object.keys(imageCache).forEach(function (imageUrl) {
+      imageLoadState[imageUrl] = IMAGE_LOADED;
+    });
 
     return function (feature, mapResolution) {
       // Determine resolution in meters/pixel.
@@ -1641,6 +1886,16 @@
         getProperty: getOlFeatureProperty,
         getFeatureId: getOlFeatureId,
       });
+
+      // Start loading images for external graphic symbolizers and when loaded:
+      // * update symbolizers to use the cached image.
+      // * call imageLoadedCallback with the image url.
+      processExternalGraphicSymbolizers(
+        rules,
+        featureTypeStyle,
+        imageLoadState,
+        imageLoadedCallback
+      );
 
       // Convert style rules to style rule lookup categorized by geometry type.
       var geometryStyles = getGeometryStyles(rules);
@@ -1662,6 +1917,7 @@
   exports.getRules = getRules;
   exports.getStyle = getStyle;
   exports.getStyleNames = getStyleNames;
+  exports.loadExternalGraphic = loadExternalGraphic;
 
   Object.defineProperty(exports, '__esModule', { value: true });
 
