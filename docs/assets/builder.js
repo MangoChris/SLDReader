@@ -21,7 +21,7 @@ const editor2 = CodeMirror.fromTextArea(document.getElementById('sld2'), {
 
 const sldChooser = document.getElementById('sld_chooser');
 
-fetch('assets/test11.xml')
+fetch('assets/test.xml')
   .then(response => response.text())
   .then(text => editor.setValue(text));
 
@@ -48,6 +48,5 @@ editor.on('change', cm => {
   const sldText = SLDReader.Builder(sldObject);
   editor2.setValue(sldText);
   console.log('SLDReader Output from SLDBuilder Generated SLD:');
-  console.log(SLDReader.Reader(cm.getValue()));
   console.log(SLDReader.Reader(sldText));
 });

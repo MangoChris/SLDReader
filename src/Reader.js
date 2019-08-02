@@ -139,10 +139,10 @@ const FilterParsers = {
 };
 
 const SymbParsers = {
-  PolygonSymbolizer: addProp,
-  LineSymbolizer: addProp,
-  PointSymbolizer: addProp,
-  TextSymbolizer: addProp,
+  //PolygonSymbolizer: addProp,
+  //LineSymbolizer: addProp,
+  //PointSymbolizer: addProp,
+  //TextSymbolizer: addProp,
   Fill: addProp,
   Stroke: addProp,
   Graphic: addProp,
@@ -203,11 +203,40 @@ const parsers = Object.assign(
       obj.featuretypestyles.push(featuretypestyle);
     },
     Rule: (element, obj) => {
-      const rule = {};
+      const rule = {
+        symbolizers: [],
+      };
       readNode(element, rule);
       obj.rules.push(rule);
     },
-
+    PolygonSymbolizer: (element, obj) => {
+      const symbol = {
+        polygonsymbolizer: {},
+      };
+      readNode(element, symbol.polygonsymbolizer);
+      obj.symbolizers.push(symbol);
+    },
+    LineSymbolizer: (element, obj) => {
+      const symbol = {
+        linesymbolizer: {},
+      };
+      readNode(element, symbol.linesymbolizer);
+      obj.symbolizers.push(symbol);
+    },
+    PointSymbolizer: (element, obj) => {
+      const symbol = {
+        pointsymbolizer: {},
+      };
+      readNode(element, symbol.pointsymbolizer);
+      obj.symbolizers.push(symbol);
+    },
+    TextSymbolizer: (element, obj) => {
+      const symbol = {
+        textsymbolizer: {},
+      };
+      readNode(element, symbol.textsymbolizer);
+      obj.symbolizers.push(symbol);
+    },
     Name: addPropWithTextContent,
     MaxScaleDenominator: addPropWithTextContent,
     MinScaleDenominator: addPropWithTextContent,

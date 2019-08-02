@@ -155,10 +155,10 @@
   };
 
   var SymbParsers = {
-    PolygonSymbolizer: addProp,
-    LineSymbolizer: addProp,
-    PointSymbolizer: addProp,
-    TextSymbolizer: addProp,
+    //PolygonSymbolizer: addProp,
+    //LineSymbolizer: addProp,
+    //PointSymbolizer: addProp,
+    //TextSymbolizer: addProp,
     Fill: addProp,
     Stroke: addProp,
     Graphic: addProp,
@@ -219,11 +219,40 @@
         obj.featuretypestyles.push(featuretypestyle);
       },
       Rule: function (element, obj) {
-        var rule = {};
+        var rule = {
+          symbolizers: [],
+        };
         readNode(element, rule);
         obj.rules.push(rule);
       },
-
+      PolygonSymbolizer: function (element, obj) {
+        var symbol = {
+          polygonsymbolizer: {},
+        };
+        readNode(element, symbol.polygonsymbolizer);
+        obj.symbolizers.push(symbol);
+      },
+      LineSymbolizer: function (element, obj) {
+        var symbol = {
+          linesymbolizer: {},
+        };
+        readNode(element, symbol.linesymbolizer);
+        obj.symbolizers.push(symbol);
+      },
+      PointSymbolizer: function (element, obj) {
+        var symbol = {
+          pointsymbolizer: {},
+        };
+        readNode(element, symbol.pointsymbolizer);
+        obj.symbolizers.push(symbol);
+      },
+      TextSymbolizer: function (element, obj) {
+        var symbol = {
+          textsymbolizer: {},
+        };
+        readNode(element, symbol.textsymbolizer);
+        obj.symbolizers.push(symbol);
+      },
       Name: addPropWithTextContent,
       MaxScaleDenominator: addPropWithTextContent,
       MinScaleDenominator: addPropWithTextContent,
@@ -641,11 +670,15 @@
             'elsefilter',
             'minscaledenominator',
             'maxscaledenominator',
-            'linesymbolizer',
-            'pointsymbolizer',
-            'polygonsymbolizer',
-            'textsymbolizer']
+            'symbolizers']
         );
+      },
+      symbolizers: function (members, result) {
+        for (var i = 0; i < members.length; i += 1) {
+          var symbolizer = members[i];
+          var type = Object.keys(symbolizer)[0];
+          builders[type](members[i][type], result);
+        }
       },
       name: function (value, result) {
         addNodeProperty(value, result, ns('Name'));

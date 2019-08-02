@@ -216,11 +216,15 @@ const builders = Object.assign(
           'elsefilter',
           'minscaledenominator',
           'maxscaledenominator',
-          'linesymbolizer',
-          'pointsymbolizer',
-          'polygonsymbolizer',
-          'textsymbolizer']
+          'symbolizers']
       );
+    },
+    symbolizers: (members, result) => {
+      for (let i = 0; i < members.length; i += 1) {
+        const symbolizer = members[i];
+        const type = Object.keys(symbolizer)[0];
+        builders[type](members[i][type], result);
+      }
     },
     name: (value, result) => {
       addNodeProperty(value, result, ns('Name'));
